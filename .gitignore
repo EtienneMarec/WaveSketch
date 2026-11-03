@@ -1,0 +1,24 @@
+# Dossiers de build CMake
+/build/
+/build-*/
+/out/
+
+# Visual Studio / VS Code / CLion
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.VC.db
+*.opendb
+CMakeSettings.json
+CMakeUserPresets.json
+
+# Outils téléchargés localement (pluginval, etc.)
+/tools/
+
+# Journaux et fichiers temporaires
+*.log
+pluginval-logs/
+Thumbs.db
+desktop.ini
