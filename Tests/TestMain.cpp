@@ -1,0 +1,34 @@
+#include <juce_core/juce_core.h>
+
+#include <iostream>
+
+namespace
+{
+    // Par défaut, JUCE envoie les messages de test au débogueur Windows : on les affiche dans la console.
+    class ConsoleTestRunner final : public juce::UnitTestRunner
+    {
+        void logMessage (const juce::String& message) override
+        {
+            std::cout << message.toStdString() << std::endl;
+        }
+    };
+}
+
+// Lance tous les tests de la catégorie "WaveSketch" et renvoie 1 en cas d'échec (pour CTest).
+int main()
+{
+    ConsoleTestRunner runner;
+    runner.setAssertOnFailure (false);
+    runner.runTestsInCategory ("WaveSketch");
+
+    int passes = 0, failures = 0;
+    for (int i = 0; i < runner.getNumResults(); ++i)
+    {
+        passes += runner.getResult (i)->passes;
+        failures += runner.getResult (i)->failures;
+    }
+
+    std::cout << "\n" << runner.getNumResults() << " tests, "
+              << passes << " verifications reussies, " << failures << " echec(s).\n";
+    return failures == 0 && passes > 0 ? 0 : 1;
+}

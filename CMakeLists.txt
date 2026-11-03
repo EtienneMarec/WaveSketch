@@ -46,8 +46,17 @@ juce_add_plugin(WaveSketch
     # ce dossier est protégé et exigerait de compiler en administrateur.
     COPY_PLUGIN_AFTER_BUILD     FALSE)
 
+# Code audio indépendant de l'interface : compilé dans le plugin ET dans les tests.
+set(WAVESKETCH_DSP_SOURCES
+    Source/dsp/Wavetable.cpp
+    Source/dsp/WaveShapes.cpp
+    Source/dsp/Voice.cpp
+    Source/dsp/SynthEngine.cpp)
+
 target_sources(WaveSketch
     PRIVATE
+        ${WAVESKETCH_DSP_SOURCES}
+        Source/Parameters.cpp
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp)
 
@@ -59,6 +68,9 @@ target_compile_definitions(WaveSketch
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0)
 
+# Les fichiers source sont en UTF-8 (accents dans les textes de l'interface).
+target_compile_options(WaveSketch PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+
 target_link_libraries(WaveSketch
     PRIVATE
         juce::juce_audio_utils
@@ -67,3 +79,34 @@ target_link_libraries(WaveSketch
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+# --- Tests --------------------------------------------------------------------
+# Programme console qui vérifie la logique audio. Lancé par build.bat via CTest.
+enable_testing()
+
+juce_add_console_app(WaveSketchTests PRODUCT_NAME "WaveSketchTests")
+
+target_sources(WaveSketchTests
+    PRIVATE
+        ${WAVESKETCH_DSP_SOURCES}
+        Tests/TestMain.cpp
+        Tests/DspTests.cpp)
+
+target_include_directories(WaveSketchTests PRIVATE Source)
+
+target_compile_definitions(WaveSketchTests
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0)
+
+target_compile_options(WaveSketchTests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+
+target_link_libraries(WaveSketchTests
+    PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+add_test(NAME WaveSketchTests COMMAND WaveSketchTests)
