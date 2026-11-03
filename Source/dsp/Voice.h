@@ -49,13 +49,19 @@ public:
 private:
     void begin (int midiNote, float velocity) noexcept;
     void updatePitch (const VoiceRenderContext& context) noexcept;
+    float readSet (const WavetableSet& set) const noexcept;
 
     Envelope envelope;
     double sampleRate = 44100.0;
     double phase = 0.0;
     double phaseIncrement = 0.0;
-    const float* tableCurrent = nullptr;
-    const float* tablePrevious = nullptr;
+
+    // Octave de table (mipmap) utilisée. Quand le pitch bend fait changer d'octave,
+    // on passe de l'ancienne à la nouvelle avec un fondu très court.
+    int level = -1;
+    int previousLevel = -1;
+    float levelFade = 1.0f;
+    float levelFadeStep = 1.0f;
 
     int note = -1;          // note "logique" (celle qu'un note off doit relâcher)
     int soundingNote = -1;  // note réellement jouée (diffère de `note` pendant un vol de voix)

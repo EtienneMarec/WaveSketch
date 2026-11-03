@@ -93,7 +93,8 @@ target_sources(WaveSketchTests
         ${WAVESKETCH_DSP_SOURCES}
         Tests/TestMain.cpp
         Tests/DspTests.cpp
-        Tests/WaveformOpsTests.cpp)
+        Tests/WaveformOpsTests.cpp
+        Tests/MipmapTests.cpp)
 
 target_include_directories(WaveSketchTests PRIVATE Source)
 

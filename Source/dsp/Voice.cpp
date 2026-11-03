@@ -7,7 +7,8 @@ namespace wavesketch
 
 namespace
 {
-    constexpr double kFadeSeconds = 0.003; // durée du fondu lors d'un vol de voix
+    constexpr double kFadeSeconds = 0.003;      // durée du fondu lors d'un vol de voix
+    constexpr double kLevelFadeSeconds = 0.005; // durée du fondu lors d'un changement d'octave de table
 
     double noteToFrequency (double note) noexcept
     {
@@ -19,6 +20,9 @@ void Voice::prepare (double newSampleRate) noexcept
 {
     sampleRate = newSampleRate;
     fadeStep = static_cast<float> (1.0 / std::max (1.0, kFadeSeconds * sampleRate));
+    levelFadeStep = static_cast<float> (1.0 / std::max (1.0, kLevelFadeSeconds * sampleRate));
+    level = previousLevel = -1;
+    levelFade = 1.0f;
     envelope.reset();
     fading = false;
     fadeGain = 1.0f;
@@ -54,6 +58,8 @@ void Voice::begin (int midiNote, float velocity) noexcept
     soundingNote = midiNote;
     velocityGain = velocity;
     phase = 0.0;
+    level = -1; // choisi au prochain updatePitch, sans fondu
+    levelFade = 1.0f;
     envelope.reset();
     envelope.noteOn();
 }
@@ -84,16 +90,38 @@ void Voice::updatePitch (const VoiceRenderContext& context) noexcept
     const double frequency = noteToFrequency (soundingNote + static_cast<double> (context.pitchBendSemitones));
     phaseIncrement = frequency / context.sampleRate;
 
-    tableCurrent = context.current != nullptr ? context.current->getTableFor (phaseIncrement) : nullptr;
-    tablePrevious = context.previous != nullptr ? context.previous->getTableFor (phaseIncrement) : nullptr;
+    const int newLevel = WavetableSet::getLevelFor (phaseIncrement);
+
+    if (level < 0)
+    {
+        level = newLevel;
+        levelFade = 1.0f;
+    }
+    else if (newLevel != level)
+    {
+        previousLevel = level;
+        level = newLevel;
+        levelFade = 0.0f;
+    }
+}
+
+float Voice::readSet (const WavetableSet& set) const noexcept
+{
+    const float sample = readTable (set.getLevel (level), phase);
+
+    if (levelFade >= 1.0f)
+        return sample;
+
+    const float old = readTable (set.getLevel (previousLevel), phase);
+    return old + (sample - old) * levelFade;
 }
 
 void Voice::render (float* out, int numSamples, const VoiceRenderContext& context) noexcept
 {
-    updatePitch (context);
-
-    if (tableCurrent == nullptr)
+    if (context.current == nullptr)
         return;
+
+    updatePitch (context);
 
     for (int i = 0; i < numSamples && isActive(); ++i)
     {
@@ -121,13 +149,16 @@ void Voice::render (float* out, int numSamples, const VoiceRenderContext& contex
             }
         }
 
-        float sample = readTable (tableCurrent, phase);
+        float sample = readSet (*context.current);
 
-        if (tablePrevious != nullptr)
+        if (context.previous != nullptr)
         {
-            const float old = readTable (tablePrevious, phase);
+            const float old = readSet (*context.previous);
             sample = old + (sample - old) * context.crossfade[i];
         }
+
+        if (levelFade < 1.0f)
+            levelFade = std::min (1.0f, levelFade + levelFadeStep);
 
         out[i] += sample * gain;
 
