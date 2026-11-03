@@ -2,6 +2,7 @@
 
 #include "PluginProcessor.h"
 #include "dsp/WaveShapes.h"
+#include "ui/WaveformEditor.h"
 
 class WaveSketchEditor final : public juce::AudioProcessorEditor
 {
@@ -13,17 +14,6 @@ public:
     void resized() override;
 
 private:
-    // Aperçu (non éditable à cette étape) de la waveform courante.
-    class WaveformPreview final : public juce::Component
-    {
-    public:
-        explicit WaveformPreview (WaveSketchProcessor& p) : audioProcessor (p) {}
-        void paint (juce::Graphics&) override;
-
-    private:
-        WaveSketchProcessor& audioProcessor;
-    };
-
     // Un potentiomètre relié à un paramètre automatisable.
     struct Knob
     {
@@ -34,12 +24,16 @@ private:
 
     void addKnob (Knob&, const juce::String& paramId, const juce::String& name);
     void addShapeButton (juce::TextButton&, const juce::String& name, wavesketch::BasicShape);
+    void addToolButton (juce::TextButton&, const juce::String& name, const juce::String& tooltip,
+                        std::function<void (wavesketch::WaveformData&)> operation);
 
     WaveSketchProcessor& audioProcessor;
     juce::LookAndFeel_V4 lookAndFeel { juce::LookAndFeel_V4::getMidnightColourScheme() };
+    juce::TooltipWindow tooltipWindow { this, 600 };
 
     juce::TextButton sineButton, triangleButton, sawButton, squareButton;
-    WaveformPreview preview { audioProcessor };
+    juce::TextButton smoothButton, invertButton, resetButton;
+    WaveformEditor waveformEditor { audioProcessor };
     Knob attackKnob, decayKnob, sustainKnob, releaseKnob, gainKnob, bendKnob;
     juce::MidiKeyboardComponent keyboard;
 

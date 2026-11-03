@@ -5,12 +5,14 @@
 
 #include "dsp/SynthEngine.h"
 #include "dsp/TablePublisher.h"
+#include "dsp/WavetableBuilder.h"
 
 // Le "processeur" est le cœur du plugin : c'est lui que l'hôte (Ableton) appelle
 // pour produire le son (processBlock) et pour sauvegarder/restaurer l'état.
 // L'interface graphique (l'éditeur) est un objet séparé, créé et détruit à la
 // demande quand l'utilisateur ouvre ou ferme la fenêtre du plugin.
 class WaveSketchProcessor final : public juce::AudioProcessor,
+                                  public juce::ChangeBroadcaster, // prévient l'interface quand la waveform change
                                   private juce::MidiKeyboardState::Listener,
                                   private juce::Timer
 {
@@ -67,8 +69,11 @@ private:
     std::atomic<float>* gainParam = nullptr;
     std::atomic<float>* bendRangeParam = nullptr;
 
-    wavesketch::TablePublisher tablePublisher; // déclaré avant le moteur, qui l'utilise
+    // Ordre important : le moteur et le thread de calcul utilisent tablePublisher,
+    // ils doivent donc être construits après lui et détruits avant lui.
+    wavesketch::TablePublisher tablePublisher;
     wavesketch::SynthEngine engine { tablePublisher };
+    wavesketch::WavetableBuilder tableBuilder { tablePublisher };
     juce::SmoothedValue<float> masterGain;
 
     wavesketch::WaveformData waveform {};

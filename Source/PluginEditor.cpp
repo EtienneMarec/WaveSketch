@@ -1,15 +1,12 @@
 #include "PluginEditor.h"
 #include "Parameters.h"
-#include "dsp/WaveShapes.h"
+#include "dsp/WaveformOps.h"
 
 using namespace wavesketch;
 
 namespace
 {
     const juce::Colour backgroundColour (0xff16181d);
-    const juce::Colour panelColour (0xff1f222a);
-    const juce::Colour gridColour (0xff2c303a);
-    const juce::Colour waveColour (0xff4fc3f7);
     const juce::Colour textColour (0xffe6e8ee);
 }
 
@@ -20,12 +17,19 @@ WaveSketchEditor::WaveSketchEditor (WaveSketchProcessor& p)
 {
     setLookAndFeel (&lookAndFeel);
 
-    addShapeButton (sineButton,     "Sinus",                              BasicShape::sine);
-    addShapeButton (triangleButton, "Triangle",                           BasicShape::triangle);
-    addShapeButton (sawButton,      "Dents de scie",                      BasicShape::saw);
-    addShapeButton (squareButton,   juce::String::fromUTF8 ("Carré"),     BasicShape::square);
+    addShapeButton (sineButton,     "Sinus",                          BasicShape::sine);
+    addShapeButton (triangleButton, "Triangle",                       BasicShape::triangle);
+    addShapeButton (sawButton,      "Dents de scie",                  BasicShape::saw);
+    addShapeButton (squareButton,   juce::String::fromUTF8 ("Carré"), BasicShape::square);
 
-    addAndMakeVisible (preview);
+    addToolButton (smoothButton, "Lisser", juce::String::fromUTF8 ("Adoucit la courbe (cliquer plusieurs fois pour lisser davantage)"),
+                   [] (WaveformData& d) { ops::smooth (d); });
+    addToolButton (invertButton, "Inverser", juce::String::fromUTF8 ("Inversion de phase : retourne la courbe verticalement"),
+                   [] (WaveformData& d) { ops::invert (d); });
+    addToolButton (resetButton, juce::String::fromUTF8 ("Réinitialiser"), juce::String::fromUTF8 ("Revient au sinus de départ"),
+                   [] (WaveformData& d) { d = makeBasicShape (BasicShape::sine); });
+
+    addAndMakeVisible (waveformEditor);
 
     addKnob (attackKnob,  params::attack,    "Attack");
     addKnob (decayKnob,   params::decay,     "Decay");
@@ -39,8 +43,8 @@ WaveSketchEditor::WaveSketchEditor (WaveSketchProcessor& p)
     addAndMakeVisible (keyboard);
 
     setResizable (true, true);
-    setResizeLimits (640, 460, 1600, 1100);
-    setSize (860, 580);
+    setResizeLimits (720, 480, 1800, 1200);
+    setSize (900, 600);
 }
 
 WaveSketchEditor::~WaveSketchEditor()
@@ -67,10 +71,20 @@ void WaveSketchEditor::addKnob (Knob& knob, const juce::String& paramId, const j
 void WaveSketchEditor::addShapeButton (juce::TextButton& button, const juce::String& name, BasicShape shape)
 {
     button.setButtonText (name);
-    button.onClick = [this, shape]
+    button.onClick = [this, shape] { audioProcessor.setWaveform (makeBasicShape (shape)); };
+    addAndMakeVisible (button);
+}
+
+void WaveSketchEditor::addToolButton (juce::TextButton& button, const juce::String& name, const juce::String& tooltip,
+                                      std::function<void (WaveformData&)> operation)
+{
+    button.setButtonText (name);
+    button.setTooltip (tooltip);
+    button.onClick = [this, op = std::move (operation)]
     {
-        audioProcessor.setWaveform (makeBasicShape (shape));
-        preview.repaint();
+        auto data = audioProcessor.getWaveform();
+        op (data);
+        audioProcessor.setWaveform (data);
     };
     addAndMakeVisible (button);
 }
@@ -89,11 +103,13 @@ void WaveSketchEditor::resized()
     auto area = getLocalBounds().reduced (12);
 
     auto top = area.removeFromTop (36);
-    top.removeFromLeft (140); // titre
+    top.removeFromLeft (130); // titre
+    const int buttonWidth = juce::jmin (100, top.getWidth() / 7);
     for (auto* b : { &sineButton, &triangleButton, &sawButton, &squareButton })
-    {
-        b->setBounds (top.removeFromLeft (110).reduced (3, 2));
-    }
+        b->setBounds (top.removeFromLeft (buttonWidth).reduced (3, 2));
+
+    for (auto* b : { &resetButton, &invertButton, &smoothButton })
+        b->setBounds (top.removeFromRight (buttonWidth).reduced (3, 2));
 
     keyboard.setBounds (area.removeFromBottom (70));
     area.removeFromBottom (8);
@@ -108,38 +124,5 @@ void WaveSketchEditor::resized()
     }
 
     area.removeFromBottom (8);
-    preview.setBounds (area.withTrimmedTop (8));
-}
-
-void WaveSketchEditor::WaveformPreview::paint (juce::Graphics& g)
-{
-    const auto bounds = getLocalBounds().toFloat();
-    g.setColour (panelColour);
-    g.fillRoundedRectangle (bounds, 6.0f);
-
-    const auto area = bounds.reduced (10.0f);
-    const float midY = area.getCentreY();
-    const float halfHeight = area.getHeight() * 0.5f;
-
-    g.setColour (gridColour);
-    for (int i = 1; i < 8; ++i)
-        g.drawVerticalLine (juce::roundToInt (area.getX() + area.getWidth() * (float) i / 8.0f), area.getY(), area.getBottom());
-    g.drawHorizontalLine (juce::roundToInt (midY), area.getX(), area.getRight());
-
-    const auto& wave = audioProcessor.getWaveform();
-    juce::Path path;
-    const int numPoints = juce::jmax (2, juce::roundToInt (area.getWidth()));
-
-    for (int x = 0; x < numPoints; ++x)
-    {
-        const int index = juce::jlimit (0, kTableSize - 1, x * kTableSize / numPoints);
-        const float px = area.getX() + area.getWidth() * (float) x / (float) (numPoints - 1);
-        const float py = midY - wave[(size_t) index] * halfHeight;
-
-        if (x == 0) path.startNewSubPath (px, py);
-        else        path.lineTo (px, py);
-    }
-
-    g.setColour (waveColour);
-    g.strokePath (path, juce::PathStrokeType (2.0f));
+    waveformEditor.setBounds (area.withTrimmedTop (8));
 }

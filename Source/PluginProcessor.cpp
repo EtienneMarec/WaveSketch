@@ -16,7 +16,9 @@ WaveSketchProcessor::WaveSketchProcessor()
     gainParam      = parameters.getRawParameterValue (params::gain);
     bendRangeParam = parameters.getRawParameterValue (params::bendRange);
 
-    setWaveform (makeBasicShape (BasicShape::sine));
+    // Première table construite tout de suite, pour que le son soit prêt dès le premier bloc.
+    waveform = makeBasicShape (BasicShape::sine);
+    tablePublisher.publish (WavetableSet::create (waveform));
 
     keyboardState.addListener (this);
     startTimerHz (10); // ramasse-miettes des anciennes tables
@@ -108,7 +110,8 @@ juce::AudioProcessorEditor* WaveSketchProcessor::createEditor()
 void WaveSketchProcessor::setWaveform (const WaveformData& newWaveform)
 {
     waveform = newWaveform;
-    tablePublisher.publish (WavetableSet::create (waveform));
+    tableBuilder.requestBuild (waveform); // calcul en arrière-plan, puis publication vers l'audio
+    sendChangeMessage();
 }
 
 void WaveSketchProcessor::timerCallback()

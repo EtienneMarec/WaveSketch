@@ -50,6 +50,7 @@ juce_add_plugin(WaveSketch
 set(WAVESKETCH_DSP_SOURCES
     Source/dsp/Wavetable.cpp
     Source/dsp/WaveShapes.cpp
+    Source/dsp/WaveformOps.cpp
     Source/dsp/Voice.cpp
     Source/dsp/SynthEngine.cpp)
 
@@ -58,7 +59,8 @@ target_sources(WaveSketch
         ${WAVESKETCH_DSP_SOURCES}
         Source/Parameters.cpp
         Source/PluginProcessor.cpp
-        Source/PluginEditor.cpp)
+        Source/PluginEditor.cpp
+        Source/ui/WaveformEditor.cpp)
 
 target_include_directories(WaveSketch PRIVATE Source)
 
@@ -90,7 +92,8 @@ target_sources(WaveSketchTests
     PRIVATE
         ${WAVESKETCH_DSP_SOURCES}
         Tests/TestMain.cpp
-        Tests/DspTests.cpp)
+        Tests/DspTests.cpp
+        Tests/WaveformOpsTests.cpp)
 
 target_include_directories(WaveSketchTests PRIVATE Source)
 
