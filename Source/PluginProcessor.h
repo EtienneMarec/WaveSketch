@@ -6,6 +6,7 @@
 #include "dsp/SynthEngine.h"
 #include "dsp/TablePublisher.h"
 #include "dsp/WavetableBuilder.h"
+#include "model/WaveformState.h"
 
 // Le "processeur" est le cœur du plugin : c'est lui que l'hôte (Ableton) appelle
 // pour produire le son (processBlock) et pour sauvegarder/restaurer l'état.
@@ -44,16 +45,32 @@ public:
     const juce::String getProgramName (int) override          { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
+    // Sauvegarde dans le projet : paramètres + waveform (mode, courbe, points) + taille de la fenêtre.
+    // Ces deux méthodes peuvent être appelées par l'hôte depuis n'importe quel thread (sauf l'audio).
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     //==============================================================================
-    // Accès depuis l'interface (message thread uniquement)
     juce::AudioProcessorValueTreeState& getParameters() noexcept { return parameters; }
     juce::MidiKeyboardState& getKeyboardState() noexcept         { return keyboardState; }
+    juce::UndoManager& getUndoManager() noexcept                 { return undoManager; }
 
-    const wavesketch::WaveformData& getWaveform() const noexcept { return waveform; }
-    void setWaveform (const wavesketch::WaveformData& newWaveform);
+    // Waveform éditée. Lecture et écriture protégées par un verrou partagé entre l'interface
+    // et l'hôte, jamais avec le thread audio (qui ne voit que les tables publiées).
+    wavesketch::WaveformState getWaveformState() const;
+
+    // Remplace la waveform sans l'ajouter à l'historique (utilisé pendant un geste à la souris).
+    void setWaveformState (const wavesketch::WaveformState& newState);
+
+    // Remplace la waveform en une étape annulable (Ctrl+Z).
+    void applyWaveformChange (const wavesketch::WaveformState& newState, const juce::String& actionName);
+
+    // Termine un geste (trait, déplacement de point...) : l'ensemble devient une seule étape annulable.
+    void commitWaveformGesture (const wavesketch::WaveformState& stateBeforeGesture, const juce::String& actionName);
+
+    // Taille de la fenêtre, mémorisée dans le projet (0 = taille par défaut).
+    juce::Point<int> getSavedEditorSize() const noexcept { return { editorWidth.load(), editorHeight.load() }; }
+    void setSavedEditorSize (juce::Point<int> size) noexcept { editorWidth = size.x; editorHeight = size.y; }
 
 private:
     void handleNoteOn (juce::MidiKeyboardState*, int midiChannel, int midiNoteNumber, float velocity) override;
@@ -76,7 +93,13 @@ private:
     wavesketch::WavetableBuilder tableBuilder { tablePublisher };
     juce::SmoothedValue<float> masterGain;
 
-    wavesketch::WaveformData waveform {};
+    mutable juce::CriticalSection waveformLock;
+    wavesketch::WaveformState waveformState;
+
+    juce::UndoManager undoManager { 200, 30 }; // au moins 30 étapes, 200 au plus
+    std::atomic<bool> undoHistoryNeedsClearing { false };
+
+    std::atomic<int> editorWidth { 0 }, editorHeight { 0 };
 
     // Clavier virtuel de l'interface : les notes passent vers l'audio par une file sans verrou.
     struct KeyboardEvent { std::uint8_t bytes[3]; };

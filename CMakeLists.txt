@@ -46,21 +46,22 @@ juce_add_plugin(WaveSketch
     # ce dossier est protégé et exigerait de compiler en administrateur.
     COPY_PLUGIN_AFTER_BUILD     FALSE)
 
-# Code audio indépendant de l'interface : compilé dans le plugin ET dans les tests.
-set(WAVESKETCH_DSP_SOURCES
+# Tout le code du plugin, compilé dans le plugin ET dans les tests (qui vérifient aussi
+# la sauvegarde/restauration du processeur complet).
+set(WAVESKETCH_SOURCES
     Source/dsp/Wavetable.cpp
     Source/dsp/WaveShapes.cpp
     Source/dsp/WaveformOps.cpp
     Source/dsp/Voice.cpp
-    Source/dsp/SynthEngine.cpp)
+    Source/dsp/SynthEngine.cpp
+    Source/model/WaveformState.cpp
+    Source/model/Presets.cpp
+    Source/Parameters.cpp
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp
+    Source/ui/WaveformEditor.cpp)
 
-target_sources(WaveSketch
-    PRIVATE
-        ${WAVESKETCH_DSP_SOURCES}
-        Source/Parameters.cpp
-        Source/PluginProcessor.cpp
-        Source/PluginEditor.cpp
-        Source/ui/WaveformEditor.cpp)
+target_sources(WaveSketch PRIVATE ${WAVESKETCH_SOURCES})
 
 target_include_directories(WaveSketch PRIVATE Source)
 
@@ -90,25 +91,27 @@ juce_add_console_app(WaveSketchTests PRODUCT_NAME "WaveSketchTests")
 
 target_sources(WaveSketchTests
     PRIVATE
-        ${WAVESKETCH_DSP_SOURCES}
+        ${WAVESKETCH_SOURCES}
         Tests/TestMain.cpp
         Tests/DspTests.cpp
         Tests/WaveformOpsTests.cpp
-        Tests/MipmapTests.cpp)
+        Tests/MipmapTests.cpp
+        Tests/StateTests.cpp)
 
 target_include_directories(WaveSketchTests PRIVATE Source)
 
 target_compile_definitions(WaveSketchTests
     PRIVATE
         JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0)
+        JUCE_USE_CURL=0
+        JucePlugin_Name="WaveSketch"
+        JucePlugin_VersionString="${PROJECT_VERSION}")
 
 target_compile_options(WaveSketchTests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 target_link_libraries(WaveSketchTests
     PRIVATE
-        juce::juce_core
-        juce::juce_audio_basics
+        juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

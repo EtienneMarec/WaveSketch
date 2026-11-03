@@ -1,4 +1,4 @@
-#include <juce_core/juce_core.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <iostream>
 
@@ -17,6 +17,9 @@ namespace
 // Lance tous les tests de la catégorie "WaveSketch" et renvoie 1 en cas d'échec (pour CTest).
 int main()
 {
+    // Le processeur et l'éditeur ont besoin du "message thread" de JUCE : ce thread principal en tient lieu.
+    juce::ScopedJuceInitialiser_GUI juceInitialiser;
+
     ConsoleTestRunner runner;
     runner.setAssertOnFailure (false);
     runner.runTestsInCategory ("WaveSketch");

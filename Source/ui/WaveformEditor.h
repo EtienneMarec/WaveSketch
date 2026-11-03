@@ -2,9 +2,12 @@
 
 #include "PluginProcessor.h"
 
-// Grande zone de dessin : affiche une période de la waveform et permet de la redessiner à la souris.
-// Chaque mouvement envoie la nouvelle waveform au processeur, qui la fait calculer en arrière-plan
-// puis la publie vers le moteur audio (avec un fondu, donc sans clic).
+// Grande zone de dessin : affiche une période de la waveform et permet de la modifier à la souris.
+//  - Mode main levée : on dessine directement la courbe.
+//  - Mode points : clic = ajouter un point (et le déplacer), glisser = déplacer,
+//    clic droit ou double-clic sur un point = le supprimer.
+// Chaque mouvement envoie la nouvelle waveform au processeur (calcul en arrière-plan, puis fondu
+// côté audio, donc sans clic). Un geste complet (de l'appui au relâchement) = une étape d'annulation.
 class WaveformEditor final : public juce::Component,
                              private juce::ChangeListener
 {
@@ -16,21 +19,41 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
-    void changeListenerCallback (juce::ChangeBroadcaster*) override { repaint(); }
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
     juce::Rectangle<float> getPlotArea() const;
     float xToIndex (float x) const;
+    float xToPhase (float x) const;
     float yToValue (float y) const;
-    void drawTo (juce::Point<float> position);
+    juce::Point<float> pointToScreen (const wavesketch::ControlPoint&) const;
+    int findPointAt (juce::Point<float> position) const;
+
+    void beginGesture();
+    void pushLiveState();
+    void freehandDrawTo (juce::Point<float> position);
+    void movePoint (int index, juce::Point<float> position);
+    void deletePoint (int index);
+
+    void paintGrid (juce::Graphics&, juce::Rectangle<float> area) const;
+    void paintCurve (juce::Graphics&, juce::Rectangle<float> area) const;
+    void paintPoints (juce::Graphics&) const;
 
     WaveSketchProcessor& audioProcessor;
+    wavesketch::WaveformState state; // copie affichée (fait foi pendant un geste)
 
-    bool isDrawing = false;
-    wavesketch::WaveformData strokeData {};
+    bool gestureActive = false;
+    wavesketch::WaveformState stateBeforeGesture;
+    juce::String gestureName;
+
     float lastIndex = 0.0f;
     float lastValue = 0.0f;
+    int draggedPoint = -1;
+    int hoveredPoint = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WaveformEditor)
 };

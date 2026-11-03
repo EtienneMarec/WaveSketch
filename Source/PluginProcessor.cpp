@@ -5,6 +5,27 @@
 
 using namespace wavesketch;
 
+namespace
+{
+    const juce::Identifier stateType { "WaveSketchState" };
+
+    // Une étape de l'historique : l'état de la waveform avant et après la modification.
+    class WaveformChangeAction final : public juce::UndoableAction
+    {
+    public:
+        WaveformChangeAction (WaveSketchProcessor& p, WaveformState beforeState, WaveformState afterState)
+            : processor (p), before (std::move (beforeState)), after (std::move (afterState)) {}
+
+        bool perform() override { processor.setWaveformState (after); return true; }
+        bool undo() override    { processor.setWaveformState (before); return true; }
+        int getSizeInUnits() override { return 1; }
+
+    private:
+        WaveSketchProcessor& processor;
+        WaveformState before, after;
+    };
+}
+
 WaveSketchProcessor::WaveSketchProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       parameters (*this, nullptr, "PARAMETERS", params::createLayout())
@@ -17,8 +38,8 @@ WaveSketchProcessor::WaveSketchProcessor()
     bendRangeParam = parameters.getRawParameterValue (params::bendRange);
 
     // Première table construite tout de suite, pour que le son soit prêt dès le premier bloc.
-    waveform = makeBasicShape (BasicShape::sine);
-    tablePublisher.publish (WavetableSet::create (waveform));
+    waveformState = WaveformState::fromSamples (makeBasicShape (BasicShape::sine));
+    tablePublisher.publish (WavetableSet::create (waveformState.samples));
 
     keyboardState.addListener (this);
     startTimerHz (10); // ramasse-miettes des anciennes tables
@@ -107,18 +128,56 @@ juce::AudioProcessorEditor* WaveSketchProcessor::createEditor()
     return new WaveSketchEditor (*this);
 }
 
-void WaveSketchProcessor::setWaveform (const WaveformData& newWaveform)
+//==============================================================================
+WaveformState WaveSketchProcessor::getWaveformState() const
 {
-    waveform = newWaveform;
-    tableBuilder.requestBuild (waveform); // calcul en arrière-plan, puis publication vers l'audio
+    const juce::ScopedLock lock (waveformLock);
+    return waveformState;
+}
+
+void WaveSketchProcessor::setWaveformState (const WaveformState& newState)
+{
+    {
+        const juce::ScopedLock lock (waveformLock);
+        if (newState == waveformState)
+            return;
+
+        waveformState = newState;
+    }
+
+    tableBuilder.requestBuild (newState.samples); // calcul en arrière-plan, puis publication vers l'audio
     sendChangeMessage();
+}
+
+void WaveSketchProcessor::applyWaveformChange (const WaveformState& newState, const juce::String& actionName)
+{
+    const auto before = getWaveformState();
+    if (before == newState)
+        return;
+
+    undoManager.beginNewTransaction (actionName);
+    undoManager.perform (new WaveformChangeAction (*this, before, newState));
+}
+
+void WaveSketchProcessor::commitWaveformGesture (const WaveformState& stateBeforeGesture, const juce::String& actionName)
+{
+    const auto after = getWaveformState();
+    if (after == stateBeforeGesture)
+        return;
+
+    undoManager.beginNewTransaction (actionName);
+    undoManager.perform (new WaveformChangeAction (*this, stateBeforeGesture, after));
 }
 
 void WaveSketchProcessor::timerCallback()
 {
     tablePublisher.collectGarbage();
+
+    if (undoHistoryNeedsClearing.exchange (false))
+        undoManager.clearUndoHistory();
 }
 
+//==============================================================================
 void WaveSketchProcessor::handleNoteOn (juce::MidiKeyboardState*, int, int note, float velocity)
 {
     pushKeyboardEvent (0x90, note, velocity);
@@ -139,19 +198,54 @@ void WaveSketchProcessor::pushKeyboardEvent (std::uint8_t status, int note, floa
     scope.forEach ([this, &event] (int index) { keyboardEvents[static_cast<size_t> (index)] = event; });
 }
 
+//==============================================================================
 void WaveSketchProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    const auto state = parameters.copyState();
+    juce::ValueTree root (stateType);
+    root.setProperty ("version", 1, nullptr);
+    root.setProperty ("pluginVersion", JucePlugin_VersionString, nullptr);
+    root.setProperty ("editorWidth", editorWidth.load(), nullptr);
+    root.setProperty ("editorHeight", editorHeight.load(), nullptr);
+    root.appendChild (parameters.copyState(), nullptr);
+    root.appendChild (getWaveformState().toValueTree(), nullptr);
 
-    if (auto xml = state.createXml())
+    if (auto xml = root.createXml())
         copyXmlToBinary (*xml, destData);
 }
 
 void WaveSketchProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    if (auto xml = getXmlFromBinary (data, sizeInBytes))
-        if (xml->hasTagName (parameters.state.getType()))
-            parameters.replaceState (juce::ValueTree::fromXml (*xml));
+    const auto xml = getXmlFromBinary (data, sizeInBytes);
+    if (xml == nullptr)
+        return; // données illisibles : on garde l'état actuel
+
+    const auto root = juce::ValueTree::fromXml (*xml);
+
+    if (root.hasType (parameters.state.getType()))
+    {
+        // Ancien format (étapes 2 à 4) : uniquement les paramètres.
+        parameters.replaceState (root);
+        return;
+    }
+
+    if (! root.hasType (stateType))
+        return;
+
+    if (const auto paramsTree = root.getChildWithName (parameters.state.getType()); paramsTree.isValid())
+        parameters.replaceState (paramsTree.createCopy());
+
+    if (const auto restored = WaveformState::fromValueTree (root.getChildWithName (WaveformState::treeType)))
+        setWaveformState (*restored);
+
+    editorWidth = static_cast<int> (root.getProperty ("editorWidth", 0));
+    editorHeight = static_cast<int> (root.getProperty ("editorHeight", 0));
+
+    // L'historique d'annulation ne concerne plus ce nouvel état. L'UndoManager n'est utilisable
+    // que depuis le message thread : si l'hôte nous appelle depuis un autre thread, le timer s'en charge.
+    if (juce::MessageManager::existsAndIsCurrentThread())
+        undoManager.clearUndoHistory();
+    else
+        undoHistoryNeedsClearing = true;
 }
 
 // Point d'entrée appelé par le wrapper JUCE (VST3 ou Standalone).
