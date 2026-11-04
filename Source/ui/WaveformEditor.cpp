@@ -1,16 +1,17 @@
 #include "WaveformEditor.h"
+#include "Theme.h"
 #include "dsp/WaveformOps.h"
 
 using namespace wavesketch;
 
 namespace
 {
-    const juce::Colour panelColour (0xff1b1e25);
-    const juce::Colour gridColour (0xff272b34);
-    const juce::Colour gridStrongColour (0xff323743);
+    const juce::Colour panelColour = theme::panel;
+    const juce::Colour gridColour (0xff252932);
+    const juce::Colour gridStrongColour (0xff30353f);
     const juce::Colour zeroLineColour (0xff5a6070);
-    const juce::Colour waveColour (0xff4fc3f7);
-    const juce::Colour pointColour (0xffffb74d);
+    const juce::Colour waveColour = theme::accent;
+    const juce::Colour pointColour = theme::points;
 
     constexpr float kPadding = 14.0f;
     constexpr float kPointRadius = 5.5f;
@@ -265,12 +266,30 @@ void WaveformEditor::paint (juce::Graphics& g)
     g.setColour (panelColour);
     g.fillRoundedRectangle (bounds, 8.0f);
 
+    g.setColour (theme::outline);
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 8.0f, 1.0f);
+
     const auto area = getPlotArea();
     paintGrid (g, area);
     paintCurve (g, area);
 
     if (state.mode == EditMode::points)
         paintPoints (g);
+
+    // Aide discrète en haut à gauche, rappelant les gestes du mode actuel.
+    const auto hint = state.mode == EditMode::points
+        ? juce::String::fromUTF8 ("Points · clic : ajouter · glisser : déplacer · clic droit / double-clic : supprimer")
+        : juce::String::fromUTF8 ("Main levée · cliquer-glisser pour dessiner une période");
+    const juce::Font hintFont (juce::FontOptions (12.5f));
+    const float hintWidth = juce::GlyphArrangement::getStringWidth (hintFont, hint) + 14.0f;
+    const auto hintArea = juce::Rectangle<float> (area.getX() + 6.0f, area.getY() + 6.0f,
+                                                  juce::jmin (hintWidth, area.getWidth() - 12.0f), 20.0f);
+
+    g.setColour (panelColour.withAlpha (0.85f)); // fond discret : la courbe ne gêne pas la lecture
+    g.fillRoundedRectangle (hintArea, 4.0f);
+    g.setColour (theme::textDim);
+    g.setFont (hintFont);
+    g.drawText (hint, hintArea.reduced (7.0f, 0.0f), juce::Justification::centredLeft, true);
 }
 
 void WaveformEditor::paintGrid (juce::Graphics& g, juce::Rectangle<float> area) const
@@ -301,16 +320,48 @@ void WaveformEditor::paintCurve (juce::Graphics& g, juce::Rectangle<float> area)
     const float midY = area.getCentreY();
     const float halfHeight = area.getHeight() * 0.5f;
 
-    // Un point par échantillon, plus le premier répété à droite pour montrer le bouclage.
+    // Un sommet par pixel environ (min et max des échantillons de la colonne) : la courbe garde
+    // ses détails fins, et le tracé reste léger même pendant un dessin rapide.
+    const int columns = juce::jlimit (2, kTableSize, juce::roundToInt (area.getWidth()));
     juce::Path curve;
-    for (int i = 0; i <= kTableSize; ++i)
-    {
-        const float x = area.getX() + area.getWidth() * static_cast<float> (i) / static_cast<float> (kTableSize);
-        const float y = midY - state.samples[static_cast<size_t> (i & kTableMask)] * halfHeight;
 
-        if (i == 0) curve.startNewSubPath (x, y);
-        else        curve.lineTo (x, y);
+    const auto addVertex = [&] (float x, float value, bool first)
+    {
+        const float y = midY - value * halfHeight;
+        if (first) curve.startNewSubPath (x, y);
+        else       curve.lineTo (x, y);
+    };
+
+    for (int c = 0; c < columns; ++c)
+    {
+        const int start = c * kTableSize / columns;
+        const int end = juce::jmax (start + 1, (c + 1) * kTableSize / columns);
+        const float x = area.getX() + area.getWidth() * static_cast<float> (start) / static_cast<float> (kTableSize);
+
+        if (end - start == 1)
+        {
+            addVertex (x, state.samples[static_cast<size_t> (start)], c == 0);
+            continue;
+        }
+
+        // Plusieurs échantillons dans la colonne : on garde le premier, le min, le max, dans l'ordre.
+        int lo = start, hi = start;
+        for (int i = start; i < end; ++i)
+        {
+            if (state.samples[static_cast<size_t> (i)] < state.samples[static_cast<size_t> (lo)]) lo = i;
+            if (state.samples[static_cast<size_t> (i)] > state.samples[static_cast<size_t> (hi)]) hi = i;
+        }
+
+        const float columnWidth = area.getWidth() / static_cast<float> (columns);
+        addVertex (x, state.samples[static_cast<size_t> (start)], c == 0);
+        const int a = juce::jmin (lo, hi), b = juce::jmax (lo, hi);
+        for (int i : { a, b })
+            if (i != start)
+                addVertex (x + columnWidth * static_cast<float> (i - start) / static_cast<float> (end - start),
+                           state.samples[static_cast<size_t> (i)], false);
     }
+
+    addVertex (area.getRight(), state.samples[0], false); // retour au début : la période boucle
 
     juce::Path fill (curve);
     fill.lineTo (area.getRight(), midY);

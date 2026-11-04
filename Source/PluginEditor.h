@@ -2,6 +2,7 @@
 
 #include "PluginProcessor.h"
 #include "dsp/WaveShapes.h"
+#include "ui/Theme.h"
 #include "ui/WaveformEditor.h"
 
 class WaveSketchEditor final : public juce::AudioProcessorEditor,
@@ -14,6 +15,10 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     bool keyPressed (const juce::KeyPress&) override;
+
+    static constexpr int kMinWidth = 820, kMinHeight = 560;
+    static constexpr int kMaxWidth = 2400, kMaxHeight = 1600;
+    static constexpr int kDefaultWidth = 980, kDefaultHeight = 660;
 
 private:
     // Un potentiomètre relié à un paramètre automatisable.
@@ -35,9 +40,10 @@ private:
     void openWaveformFile();
     void saveWaveformFile();
     void showError (const juce::String& message);
+    void layoutKnobGroup (juce::Rectangle<int> area, std::initializer_list<Knob*> knobs);
 
     WaveSketchProcessor& audioProcessor;
-    juce::LookAndFeel_V4 lookAndFeel { juce::LookAndFeel_V4::getMidnightColourScheme() };
+    wavesketch::theme::LookAndFeel lookAndFeel;
     juce::TooltipWindow tooltipWindow { this, 600 };
 
     juce::TextButton freehandModeButton, pointsModeButton;
@@ -48,6 +54,9 @@ private:
     WaveformEditor waveformEditor { audioProcessor };
     Knob attackKnob, decayKnob, sustainKnob, releaseKnob, gainKnob, bendKnob;
     juce::MidiKeyboardComponent keyboard;
+
+    // Zones calculées dans resized() et décorées dans paint()
+    juce::Rectangle<int> headerArea, envelopePanel, outputPanel;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 

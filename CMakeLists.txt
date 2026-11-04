@@ -59,6 +59,7 @@ set(WAVESKETCH_SOURCES
     Source/Parameters.cpp
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/ui/Theme.cpp
     Source/ui/WaveformEditor.cpp)
 
 target_sources(WaveSketch PRIVATE ${WAVESKETCH_SOURCES})
@@ -96,7 +97,8 @@ target_sources(WaveSketchTests
         Tests/DspTests.cpp
         Tests/WaveformOpsTests.cpp
         Tests/MipmapTests.cpp
-        Tests/StateTests.cpp)
+        Tests/StateTests.cpp
+        Tests/Snapshots.cpp)
 
 target_include_directories(WaveSketchTests PRIVATE Source)
 

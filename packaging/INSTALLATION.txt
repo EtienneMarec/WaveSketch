@@ -1,0 +1,33 @@
+WaveSketch - synthétiseur à waveform dessinée (VST3, Windows 64 bits)
+=====================================================================
+
+Contenu de l'archive
+--------------------
+  WaveSketch.vst3   le plugin (c'est un DOSSIER : il faut le copier en entier)
+  WaveSketch.exe    version autonome, pour essayer sans logiciel de musique
+
+Aucune installation supplémentaire n'est nécessaire (pas de "Visual C++ Redistributable").
+
+
+Installation
+------------
+1. Fermer Ableton Live (ou votre logiciel de musique).
+2. Copier le dossier "WaveSketch.vst3" dans :
+       C:\Program Files\Common Files\VST3
+   Windows demande une autorisation administrateur : cliquer sur "Continuer".
+3. Lancer Ableton Live.
+
+
+Faire apparaître WaveSketch dans Ableton Live
+---------------------------------------------
+1. Options > Préférences > onglet "Plug-ins".
+2. Activer "Utiliser les dossiers système des plug-ins VST3"
+   (en anglais : "Use VST3 Plug-in System Folders").
+3. Cliquer sur "Rescan" (ou "Réanalyser").
+4. Dans le navigateur : Plug-ins > VST3 > WaveSketch Audio > WaveSketch.
+5. Glisser WaveSketch sur une piste MIDI, puis jouer des notes.
+
+
+Désinstallation
+---------------
+Supprimer le dossier C:\Program Files\Common Files\VST3\WaveSketch.vst3.

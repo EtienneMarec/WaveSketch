@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+int renderSnapshots (const juce::File& folder);
+
 namespace
 {
     // Par défaut, JUCE envoie les messages de test au débogueur Windows : on les affiche dans la console.
@@ -15,10 +17,14 @@ namespace
 }
 
 // Lance tous les tests de la catégorie "WaveSketch" et renvoie 1 en cas d'échec (pour CTest).
-int main()
+// Avec "--snapshots <dossier>", produit à la place des captures de l'interface.
+int main (int argc, char* argv[])
 {
     // Le processeur et l'éditeur ont besoin du "message thread" de JUCE : ce thread principal en tient lieu.
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
+
+    if (argc >= 3 && juce::String (argv[1]) == "--snapshots")
+        return renderSnapshots (juce::File::getCurrentWorkingDirectory().getChildFile (juce::String::fromUTF8 (argv[2])));
 
     ConsoleTestRunner runner;
     runner.setAssertOnFailure (false);

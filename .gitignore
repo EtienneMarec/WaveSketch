@@ -17,6 +17,9 @@ CMakeUserPresets.json
 # Outils téléchargés localement (pluginval, etc.)
 /tools/
 
+# Archives produites par package.bat
+/dist/
+
 # Journaux et fichiers temporaires
 *.log
 pluginval-logs/

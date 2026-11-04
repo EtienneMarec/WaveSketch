@@ -149,9 +149,26 @@ Pour chaque échelle : *Paramètres Windows → Système → Écran → Échelle
 - [ ] Sur un PC **sans Visual Studio**, copier `WaveSketch.vst3` dans `C:\Program Files\Common Files\VST3` : le plugin se charge dans Ableton sans demander d'installer quoi que ce soit (pas d'erreur « VCRUNTIME140.dll manquant »).
 - [ ] Un projet Ableton créé sur ton PC s'ouvre sur l'autre PC avec le même son et le même dessin.
 
-## 15. Finition (étape 6) — à compléter
+## 15. Finition de l'interface et distribution
 
-Cette section sera complétée à la fin de l'étape 6 (finition de l'interface et distribution).
+**Interface**
+- [ ] Les potentiomètres répondent au glisser vertical **et** horizontal ; leur arc bleu suit la valeur.
+- [ ] **Double-clic** sur un potentiomètre : retour à sa valeur par défaut (Attack 5 ms, Decay 300 ms, Sustain 80 %, Release 300 ms, Volume -6 dB, Bend ±2 st).
+- [ ] **Clic sur la valeur** sous un potentiomètre, taper `1.5 s` (ou `250 ms`) puis Entrée : la valeur est appliquée.
+- [ ] Les info-bulles apparaissent au survol des boutons (environ une demi-seconde).
+- [ ] Le bouton de mode actif (Main levée / Points) est surligné en bleu ; « Lisser » est grisé en mode points.
+- [ ] L'aide en haut à gauche de la zone de dessin change selon le mode et reste lisible même quand la courbe passe dessous.
+- [ ] Taille **minimale** (réduire la fenêtre au maximum) : tous les boutons restent lisibles, rien ne se chevauche.
+- [ ] Taille **maximale** / plein écran : la zone de dessin s'agrandit, le clavier virtuel occupe toute la largeur.
+- [ ] Redimensionner pendant qu'une note joue : aucun craquement audio.
+- [ ] Dessiner vite en grande taille de fenêtre : l'affichage reste fluide (pas de saccades visibles).
+- [ ] Fermer la fenêtre en tenant une note du clavier virtuel : la note s'arrête (pas de note bloquée).
+
+**Distribution**
+- [ ] `package.bat` crée `dist\WaveSketch-0.1.0-win64.zip` contenant `WaveSketch.vst3`, `WaveSketch.exe` et `INSTALLATION.txt`.
+- [ ] En suivant **uniquement** `INSTALLATION.txt` (sur un autre PC si possible), le plugin s'installe et apparaît dans Ableton.
+- [ ] `validate.bat` affiche « pluginval : SUCCES (rigueur 10) ».
+- [ ] Le `README.md` suffit à une autre personne pour cloner, compiler et installer le projet.
 
 ---
 

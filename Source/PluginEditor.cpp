@@ -7,11 +7,7 @@ using namespace wavesketch;
 
 namespace
 {
-    const juce::Colour backgroundColour (0xff16181d);
-    const juce::Colour textColour (0xffe6e8ee);
-
     constexpr int kModeGroup = 1001;
-    constexpr int kDefaultWidth = 960, kDefaultHeight = 640;
 
     juce::String utf8 (const char* text) { return juce::String::fromUTF8 (text); }
 
@@ -33,6 +29,33 @@ namespace
     void rememberWaveformFolder (const juce::File& file)
     {
         lastWaveformFolder() = file.getParentDirectory();
+    }
+
+    // Place une rangée de boutons collés les uns aux autres (bords communs sans arrondi).
+    void layoutButtonRow (juce::Rectangle<int>& row, std::initializer_list<juce::Button*> buttons, int width, bool fromLeft)
+    {
+        const int count = static_cast<int> (buttons.size());
+        int index = 0;
+
+        for (auto* b : buttons)
+        {
+            int edges = 0;
+            if (index > 0)         edges |= juce::Button::ConnectedOnLeft;
+            if (index < count - 1) edges |= juce::Button::ConnectedOnRight;
+            b->setConnectedEdges (edges);
+            ++index;
+        }
+
+        if (fromLeft)
+        {
+            for (auto* b : buttons)
+                b->setBounds (row.removeFromLeft (width));
+        }
+        else
+        {
+            for (auto it = std::rbegin (buttons); it != std::rend (buttons); ++it)
+                (*it)->setBounds (row.removeFromRight (width));
+        }
     }
 }
 
@@ -56,6 +79,7 @@ WaveSketchEditor::WaveSketchEditor (WaveSketchProcessor& p)
 
     // --- Presets et fichiers ---
     presetBox.setTextWhenNothingSelected ("Presets");
+    presetBox.setTooltip (utf8 ("Waveforms intégrées"));
     const auto& presets = getBuiltInPresets();
     for (int i = 0; i < static_cast<int> (presets.size()); ++i)
         presetBox.addItem (presets[static_cast<size_t> (i)].name, i + 1);
@@ -122,9 +146,11 @@ WaveSketchEditor::WaveSketchEditor (WaveSketchProcessor& p)
     addKnob (releaseKnob, params::release,   "Release");
     addKnob (gainKnob,    params::gain,      "Volume");
     addKnob (bendKnob,    params::bendRange, "Bend");
+    bendKnob.slider.setTooltip (utf8 ("Amplitude de la molette de pitch bend, en demi-tons"));
 
     keyboard.setAvailableRange (24, 108);
     keyboard.setLowestVisibleKey (48);
+    keyboard.setScrollButtonWidth (20);
     addAndMakeVisible (keyboard);
 
     audioProcessor.addChangeListener (this);
@@ -136,12 +162,16 @@ WaveSketchEditor::WaveSketchEditor (WaveSketchProcessor& p)
 
     setWantsKeyboardFocus (true);
     setResizable (true, true);
-    setResizeLimits (820, 540, 2000, 1400);
+    setResizeLimits (kMinWidth, kMinHeight, kMaxWidth, kMaxHeight);
 
-    if (saved.x >= 820 && saved.y >= 540)
-        setSize (juce::jmin (saved.x, 2000), juce::jmin (saved.y, 1400));
+    if (saved.x >= kMinWidth && saved.y >= kMinHeight)
+        setSize (juce::jmin (saved.x, kMaxWidth), juce::jmin (saved.y, kMaxHeight));
     else
         setSize (kDefaultWidth, kDefaultHeight);
+
+    // Certains éléments (comme la zone de valeur des potentiomètres) sont créés avant d'être
+    // ajoutés à la fenêtre : on leur réapplique le thème une fois tout en place.
+    sendLookAndFeelChange();
 }
 
 WaveSketchEditor::~WaveSketchEditor()
@@ -157,12 +187,17 @@ WaveSketchEditor::~WaveSketchEditor()
 //==============================================================================
 void WaveSketchEditor::addKnob (Knob& knob, const juce::String& paramId, const juce::String& name)
 {
-    knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 20);
+    knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 90, 18);
+    knob.slider.setRotaryParameters (juce::degreesToRadians (225.0f), juce::degreesToRadians (495.0f), true);
+    knob.slider.setDoubleClickReturnValue (true, audioProcessor.getParameters().getParameter (paramId)->convertFrom0to1 (
+                                                     audioProcessor.getParameters().getParameter (paramId)->getDefaultValue()));
     addAndMakeVisible (knob.slider);
 
     knob.label.setText (name, juce::dontSendNotification);
     knob.label.setJustificationType (juce::Justification::centred);
-    knob.label.setColour (juce::Label::textColourId, textColour);
+    knob.label.setFont (juce::FontOptions (14.0f, juce::Font::bold));
+    knob.label.setColour (juce::Label::textColourId, theme::text);
+    knob.label.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (knob.label);
 
     knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -290,53 +325,87 @@ void WaveSketchEditor::showError (const juce::String& message)
 //==============================================================================
 void WaveSketchEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (backgroundColour);
+    g.fillAll (theme::background);
 
-    g.setColour (textColour);
-    g.setFont (juce::FontOptions (20.0f, juce::Font::bold));
-    g.drawText ("WaveSketch", getLocalBounds().reduced (16, 0).removeFromTop (48), juce::Justification::centredLeft);
+    // Titre et version
+    auto title = headerArea.withWidth (220);
+    g.setColour (theme::text);
+    g.setFont (juce::FontOptions (22.0f, juce::Font::bold));
+    g.drawText ("WaveSketch", title.removeFromTop (title.getHeight() * 3 / 5), juce::Justification::bottomLeft);
+    g.setColour (theme::textDim);
+    g.setFont (juce::FontOptions (11.5f));
+    g.drawText (juce::String ("v") + JucePlugin_VersionString + juce::String::fromUTF8 (" · synthé à waveform dessinée"),
+                title, juce::Justification::topLeft);
+
+    // Panneaux des réglages, avec leur titre
+    for (auto [panel, name] : { std::pair { envelopePanel, "ENVELOPPE" }, std::pair { outputPanel, "SORTIE" } })
+    {
+        if (panel.isEmpty())
+            continue;
+
+        g.setColour (theme::panel);
+        g.fillRoundedRectangle (panel.toFloat(), 8.0f);
+        g.setColour (theme::outline);
+        g.drawRoundedRectangle (panel.toFloat().reduced (0.5f), 8.0f, 1.0f);
+
+        g.setColour (theme::textDim);
+        g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+        g.drawText (name, panel.reduced (12, 6).removeFromTop (14), juce::Justification::topLeft);
+    }
+}
+
+void WaveSketchEditor::layoutKnobGroup (juce::Rectangle<int> area, std::initializer_list<Knob*> knobs)
+{
+    area = area.reduced (8, 0).withTrimmedTop (18).withTrimmedBottom (6);
+    const int width = area.getWidth() / static_cast<int> (knobs.size());
+
+    for (auto* k : knobs)
+    {
+        auto cell = area.removeFromLeft (width);
+        k->label.setBounds (cell.removeFromTop (18));
+        k->slider.setBounds (cell.reduced (4, 0));
+    }
 }
 
 void WaveSketchEditor::resized()
 {
     audioProcessor.setSavedEditorSize ({ getWidth(), getHeight() });
 
-    auto area = getLocalBounds().reduced (12);
+    auto area = getLocalBounds().reduced (14, 10);
 
-    // Ligne 1 : titre, mode, presets, fichiers, annuler/rétablir
-    auto row1 = area.removeFromTop (36);
-    row1.removeFromLeft (130);
-    freehandModeButton.setBounds (row1.removeFromLeft (100).reduced (2, 3));
-    pointsModeButton.setBounds (row1.removeFromLeft (80).reduced (2, 3));
+    // En-tête : titre à gauche ; presets, fichiers et annuler/rétablir à droite
+    headerArea = area.removeFromTop (46);
+    auto header = headerArea.reduced (0, 7);
+    layoutButtonRow (header, { &undoButton, &redoButton }, 84, false);
+    header.removeFromRight (12);
+    layoutButtonRow (header, { &openButton, &saveButton }, 104, false);
+    header.removeFromRight (8);
+    presetBox.setBounds (header.removeFromRight (juce::jlimit (120, 200, header.getWidth() - 230)));
 
-    for (auto* b : { &redoButton, &undoButton })
-        b->setBounds (row1.removeFromRight (80).reduced (2, 3));
-    row1.removeFromRight (8);
-    for (auto* b : { &saveButton, &openButton })
-        b->setBounds (row1.removeFromRight (100).reduced (2, 3));
-    presetBox.setBounds (row1.removeFromRight (juce::jmin (180, row1.getWidth() - 8)).reduced (4, 4));
+    // Barre d'outils : mode, formes de base, transformations
+    area.removeFromTop (6);
+    auto toolbar = area.removeFromTop (32);
+    const int toolWidth = juce::jlimit (72, 112, (toolbar.getWidth() - 40) / 9);
+    layoutButtonRow (toolbar, { &freehandModeButton, &pointsModeButton }, toolWidth, true);
+    toolbar.removeFromLeft (20);
+    layoutButtonRow (toolbar, { &sineButton, &triangleButton, &sawButton, &squareButton }, toolWidth, true);
+    layoutButtonRow (toolbar, { &smoothButton, &invertButton, &resetButton }, toolWidth, false);
 
-    // Ligne 2 : formes de base et outils
-    area.removeFromTop (4);
-    auto row2 = area.removeFromTop (32);
-    const int buttonWidth = juce::jmin (110, row2.getWidth() / 7);
-    for (auto* b : { &sineButton, &triangleButton, &sawButton, &squareButton })
-        b->setBounds (row2.removeFromLeft (buttonWidth).reduced (2, 2));
-    for (auto* b : { &resetButton, &invertButton, &smoothButton })
-        b->setBounds (row2.removeFromRight (buttonWidth).reduced (2, 2));
+    // Bas : clavier, puis réglages
+    keyboard.setBounds (area.removeFromBottom (juce::jlimit (52, 80, getHeight() / 10)));
+    // 50 touches blanches entre C0 et C7 : le clavier occupe toute la largeur.
+    keyboard.setKeyWidth (juce::jmax (12.0f, static_cast<float> (keyboard.getWidth()) / 50.0f));
+    area.removeFromBottom (10);
 
-    keyboard.setBounds (area.removeFromBottom (70));
-    area.removeFromBottom (8);
+    auto controls = area.removeFromBottom (juce::jlimit (130, 180, getHeight() / 4));
+    envelopePanel = controls.removeFromLeft (controls.getWidth() * 4 / 6 - 5);
+    controls.removeFromLeft (10);
+    outputPanel = controls;
+    layoutKnobGroup (envelopePanel, { &attackKnob, &decayKnob, &sustainKnob, &releaseKnob });
+    layoutKnobGroup (outputPanel, { &gainKnob, &bendKnob });
 
-    auto knobs = area.removeFromBottom (120);
-    const int knobWidth = knobs.getWidth() / 6;
-    for (auto* k : { &attackKnob, &decayKnob, &sustainKnob, &releaseKnob, &gainKnob, &bendKnob })
-    {
-        auto cell = knobs.removeFromLeft (knobWidth);
-        k->label.setBounds (cell.removeFromTop (20));
-        k->slider.setBounds (cell);
-    }
-
-    area.removeFromBottom (8);
-    waveformEditor.setBounds (area.withTrimmedTop (8));
+    // Centre : la zone de dessin prend toute la place restante
+    area.removeFromBottom (10);
+    area.removeFromTop (8);
+    waveformEditor.setBounds (area);
 }

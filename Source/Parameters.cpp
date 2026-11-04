@@ -55,7 +55,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
 
     layout.add (std::make_unique<juce::AudioParameterInt> (
         juce::ParameterID { bendRange, 1 }, "Pitch Bend Range", 0, 24, 2,
-        juce::AudioParameterIntAttributes().withLabel ("st")));
+        juce::AudioParameterIntAttributes()
+            .withLabel ("st")
+            .withStringFromValueFunction ([] (int v, int) { return juce::String::fromUTF8 ("±") + juce::String (v) + " st"; })
+            .withValueFromStringFunction ([] (const juce::String& t) { return t.retainCharacters ("0123456789").getIntValue(); })));
 
     return layout;
 }
