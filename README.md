@@ -1,49 +1,51 @@
 # WaveSketch
 
-Synthétiseur **VST3** pour Windows (64 bits) dont le son vient d'une waveform **dessinée à la souris**.
-Conçu pour Ableton Live, utilisable dans tout logiciel compatible VST3, et livré aussi en version autonome
-(Standalone) pour tester sans logiciel de musique.
+A **VST3** synthesizer for Windows (64-bit) whose sound comes from a waveform **drawn with the mouse**.
+Designed for Ableton Live, usable in any VST3-compatible host, and also shipped as a standalone app
+so you can try it without a DAW.
 
-![Interface de WaveSketch](docs/capture.png)
+![WaveSketch user interface](docs/capture.png)
 
-## Fonctionnalités
+## Features
 
-- **Dessin d'une période** de la waveform, à main levée (sans trous même si la souris va vite)
-  ou en **mode points** (points reliés par une courbe lisse, ajout / déplacement / suppression).
-- Formes de base en un clic (sinus, triangle, dents de scie, carré), **lisser**, **inverser** (phase),
-  **réinitialiser**, **annuler / rétablir** (Ctrl+Z / Ctrl+Y).
-- 14 **presets** intégrés, **ouverture / enregistrement** de fichiers `.wavesketch`.
-- Oscillateur wavetable 2048 points avec interpolation d'Hermite, **16 voix** avec vol de voix,
-  vélocité, pitch bend (plage réglable), pédale de sustain.
-- **Enveloppe ADSR** par voix et **volume** général, tous automatisables dans Ableton, lissés pour éviter les clics.
-- **Anti-aliasing** par tables à bande limitée calculées par FFT (une par octave), **retrait du DC**
-  et **normalisation** du niveau, sans modifier le dessin affiché.
-- Modifier la waveform pendant qu'une note joue ne provoque **ni clic ni plantage** (fondu de 20 ms).
-- Tout est **enregistré dans le projet** Ableton (waveform, points, réglages, taille de la fenêtre).
-- Interface sombre, **redimensionnable**, entièrement vectorielle (nette à 125 % et 150 %).
+- **Draw one period** of the waveform, freehand (no gaps even when the mouse moves fast)
+  or in **points mode** (points joined by a smooth curve; add / move / delete).
+- One-click basic shapes (sine, triangle, sawtooth, square), **smooth**, **invert** (phase),
+  **reset**, **undo / redo** (Ctrl+Z / Ctrl+Y).
+- 14 built-in **presets**, **open / save** `.wavesketch` files.
+- 2048-sample wavetable oscillator with Hermite interpolation, **16 voices** with voice stealing,
+  velocity, pitch bend (adjustable range), sustain pedal.
+- Per-voice **ADSR envelope** and master **volume**, all automatable in Ableton and smoothed to avoid clicks.
+- **Anti-aliasing** with band-limited tables computed by FFT (one per octave), **DC removal**
+  and level **normalisation**, without changing the drawing shown on screen.
+- Editing the waveform while a note is playing causes **no clicks and no crashes** (20 ms crossfade).
+- Everything is **saved in the Ableton project** (waveform, points, settings, window size).
+- Dark, **resizable**, fully vector-based UI (stays sharp at 125 % and 150 % display scaling).
+
+> Note: the UI, the manual test checklist and the installation guide are in French.
 
 ---
 
-## 1. Prérequis
+## 1. Requirements
 
-| Outil | Version | Installation (PowerShell) |
+| Tool | Version | Install (PowerShell) |
 |---|---|---|
-| Windows | 10 ou 11, 64 bits | — |
-| Git | toute version récente | `winget install --id Git.Git -e` |
-| CMake | 3.22 ou plus | `winget install --id Kitware.CMake -e` |
-| Visual Studio 2022 **ou** Build Tools 2022, avec « Développement Desktop en C++ » | 17.x | voir ci-dessous |
+| Windows | 10 or 11, 64-bit | — |
+| Git | any recent version | `winget install --id Git.Git -e` |
+| CMake | 3.22 or later | `winget install --id Kitware.CMake -e` |
+| Visual Studio 2022 **or** Build Tools 2022, with "Desktop development with C++" | 17.x | see below |
 
-Build Tools 2022 (compilateur seul, sans l'éditeur Visual Studio) :
+Build Tools 2022 (compiler only, without the Visual Studio IDE):
 
 ```powershell
 winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
-> Laisse la fenêtre de l'installateur ouverte jusqu'à la fin et accepte la demande d'autorisation Windows.
-> JUCE n'a pas besoin d'être installé : il est téléchargé automatiquement à la première compilation
-> (connexion Internet nécessaire une seule fois).
+> Keep the installer window open until it finishes and accept the Windows permission prompt.
+> JUCE does not need to be installed: it is downloaded automatically on the first build
+> (an Internet connection is needed once).
 
-## 2. Compiler
+## 2. Build
 
 ```bat
 git clone https://github.com/EtienneMarec/WaveSketch.git
@@ -51,19 +53,19 @@ cd WaveSketch
 build.bat
 ```
 
-`build.bat` configure le projet, compile en **Release** et lance les tests automatiques.
-Il **ne copie rien** dans `C:\Program Files` : pas besoin de le lancer en administrateur.
+`build.bat` configures the project, builds it in **Release** mode and runs the automated tests.
+It **does not copy anything** into `C:\Program Files`, so it does not need to run as administrator.
 
-Fichiers produits :
+Output files:
 
-| Fichier | Chemin |
+| File | Path |
 |---|---|
-| Plugin VST3 | `build\WaveSketch_artefacts\Release\VST3\WaveSketch.vst3` |
-| Version autonome | `build\WaveSketch_artefacts\Release\Standalone\WaveSketch.exe` |
+| VST3 plugin | `build\WaveSketch_artefacts\Release\VST3\WaveSketch.vst3` |
+| Standalone app | `build\WaveSketch_artefacts\Release\Standalone\WaveSketch.exe` |
 | Tests | `build\WaveSketchTests_artefacts\Release\WaveSketchTests.exe` |
 
 <details>
-<summary>Commandes équivalentes, sans le script</summary>
+<summary>Equivalent commands, without the script</summary>
 
 ```bat
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
@@ -72,106 +74,106 @@ ctest --test-dir build -C Release --output-on-failure
 ```
 </details>
 
-> ⚠ Si la compilation échoue avec « LNK1104 : impossible d'ouvrir le fichier WaveSketch.vst3 »,
-> c'est qu'un logiciel (Ableton, pluginval) utilise le plugin : ferme-le puis recompile.
+> ⚠ If the build fails with "LNK1104: cannot open file WaveSketch.vst3", another program
+> (Ableton, pluginval) is using the plugin: close it and build again.
 
-## 3. Installer le plugin
+## 3. Install the plugin
 
-Un plugin VST3 est un **dossier** nommé `WaveSketch.vst3`. Copie-le **en entier** dans le dossier
-système des plugins VST3 :
+A VST3 plugin is a **folder** named `WaveSketch.vst3`. Copy the **whole folder** into the system
+VST3 folder:
 
 ```
 C:\Program Files\Common Files\VST3
 ```
 
-Avec l'Explorateur : copier-coller le dossier, puis accepter la demande d'autorisation administrateur.
-Ou dans un PowerShell **lancé en administrateur** :
+With File Explorer: copy and paste the folder, then accept the administrator permission prompt.
+Or in a PowerShell window **run as administrator**:
 
 ```powershell
 Copy-Item -Recurse -Force "build\WaveSketch_artefacts\Release\VST3\WaveSketch.vst3" "C:\Program Files\Common Files\VST3\"
 ```
 
-> Pense à fermer Ableton avant de remplacer une ancienne version du plugin.
+> Close Ableton before replacing an older version of the plugin.
 
-## 4. Faire apparaître WaveSketch dans Ableton Live
+## 4. Make WaveSketch show up in Ableton Live
 
-1. *Options → Préférences → Plug-ins*.
-2. Activer **« Utiliser les dossiers système des plug-ins VST3 »** (*Use VST3 Plug-in System Folders*).
-3. Cliquer sur **« Rescan »** (relance l'analyse des plugins).
-4. Dans le navigateur : *Plug-ins → VST3 → WaveSketch Audio → WaveSketch*.
-5. Glisser WaveSketch sur une **piste MIDI** et jouer des notes (clavier MIDI, ou touche **M** d'Ableton
-   pour utiliser le clavier de l'ordinateur).
+1. *Options → Preferences → Plug-Ins*.
+2. Turn on **"Use VST3 Plug-In System Folders"**.
+3. Click **"Rescan"** to scan the plugins again.
+4. In the browser: *Plug-Ins → VST3 → WaveSketch Audio → WaveSketch*.
+5. Drag WaveSketch onto a **MIDI track** and play some notes (MIDI keyboard, or press **M** in Ableton
+   to use the computer keyboard).
 
-Le plugin n'apparaît pas ? Vérifie que le dossier copié s'appelle bien `WaveSketch.vst3` et contient
-`Contents\x86_64-win\WaveSketch.vst3`, puis relance un *Rescan* (maintenir *Alt* en cliquant force une
-analyse complète).
+The plugin does not show up? Check that the copied folder is named `WaveSketch.vst3` and contains
+`Contents\x86_64-win\WaveSketch.vst3`, then run *Rescan* again (holding *Alt* while clicking forces a
+full rescan).
 
-## 5. Utilisation rapide
+## 5. Quick usage
 
-| Action | Comment |
+| Action | How |
 |---|---|
-| Dessiner | Mode **Main levée**, cliquer-glisser dans la zone centrale |
-| Mode points | Bouton **Points** · clic = ajouter · glisser = déplacer · clic droit ou double-clic = supprimer |
-| Annuler / rétablir | **Ctrl+Z** / **Ctrl+Y** (ou Ctrl+Maj+Z), ou les boutons en haut à droite |
-| Remettre un potentiomètre à sa valeur par défaut | Double-clic sur le potentiomètre |
-| Saisir une valeur | Clic sur la valeur affichée sous le potentiomètre, puis taper (`250 ms`, `1.5 s`, `-12`) et Entrée |
-| Waveforms enregistrées | `Documents\WaveSketch\*.wavesketch` par défaut |
+| Draw | **Main levée** (freehand) mode, click and drag in the central area |
+| Points mode | **Points** button · click = add · drag = move · right-click or double-click = delete |
+| Undo / redo | **Ctrl+Z** / **Ctrl+Y** (or Ctrl+Shift+Z), or the buttons in the top-right corner |
+| Reset a knob to its default value | Double-click the knob |
+| Type a value | Click the value shown under the knob, type it (`250 ms`, `1.5 s`, `-12`) and press Enter |
+| Saved waveforms | `Documents\WaveSketch\*.wavesketch` by default |
 
-## 6. Vérifier
+## 6. Verify
 
-- **Tests automatiques** : lancés par `build.bat` (wavetable, interpolation, mipmaps et aliasing mesuré,
-  enveloppe, voix, dessin, mode points, sauvegarde / restauration de l'état, annulation).
-- **pluginval** (validation de plugin, niveau de rigueur maximal 10) : télécharger `pluginval_Windows.zip`
-  depuis les [releases de Tracktion/pluginval](https://github.com/Tracktion/pluginval/releases),
-  extraire `pluginval.exe` dans `tools\pluginval\`, puis lancer `validate.bat`.
-- **Captures de l'interface** (100 %, 125 %, 150 %) sans DAW :
+- **Automated tests**: run by `build.bat` (wavetable, interpolation, mipmaps and measured aliasing,
+  envelope, voices, drawing, points mode, state save / restore, undo).
+- **pluginval** (plugin validation, maximum strictness level 10): download `pluginval_Windows.zip`
+  from the [Tracktion/pluginval releases](https://github.com/Tracktion/pluginval/releases),
+  extract `pluginval.exe` into `tools\pluginval\`, then run `validate.bat`.
+- **UI screenshots** (100 %, 125 %, 150 % scaling) without a DAW:
   `build\WaveSketchTests_artefacts\Release\WaveSketchTests.exe --snapshots captures`
-- **Tests manuels** (écoute, Ableton, affichage, distribution) : voir [TESTS_MANUELS.md](TESTS_MANUELS.md).
+- **Manual tests** (listening, Ableton, display, distribution): see [TESTS_MANUELS.md](TESTS_MANUELS.md) (in French).
 
-## 7. Distribuer à une autre personne
+## 7. Share it with someone else
 
 ```bat
 package.bat
 ```
 
-Crée `dist\WaveSketch-<version>-win64.zip` contenant le plugin, la version autonome et une notice
-d'installation ([packaging/INSTALLATION.txt](packaging/INSTALLATION.txt)).
-Le runtime C++ de Microsoft est **lié en statique** : la personne n'a rien d'autre à installer.
-Le numéro de version se règle dans `CMakeLists.txt` (`project(WaveSketch VERSION ...)`).
+Creates `dist\WaveSketch-<version>-win64.zip` with the plugin, the standalone app and an installation
+guide ([packaging/INSTALLATION.txt](packaging/INSTALLATION.txt), in French).
+The Microsoft C++ runtime is **linked statically**, so the recipient has nothing else to install.
+The version number is set in `CMakeLists.txt` (`project(WaveSketch VERSION ...)`).
 
-> Avant de distribuer, vérifie les conditions de licence de JUCE (voir *Licence* ci-dessous).
+> Before distributing, check JUCE's licence terms (see *Licence* below).
 
-## 8. Organisation du code
+## 8. Code layout
 
 ```
 Source/
-  PluginProcessor.*   cœur du plugin : processBlock, paramètres, sauvegarde de l'état, annulation
-  PluginEditor.*      fenêtre principale (boutons, potentiomètres, clavier virtuel)
-  Parameters.*        paramètres automatisables (identifiants à ne jamais renommer)
-  dsp/                moteur audio (aucune allocation ni verrou dans le thread audio)
-    Wavetable.*         tables à bande limitée par FFT, DC, normalisation, interpolation
-    Voice.*, Envelope.h une voix : oscillateur + ADSR + vélocité
-    SynthEngine.*       16 voix, MIDI, vol de voix, fondu entre waveforms
-    TablePublisher.h    passage des tables vers l'audio par échange atomique, sans libération côté audio
-    WavetableBuilder.h  thread d'arrière-plan qui calcule les tables
-    WaveformOps.*, WaveShapes.*  trait, lissage, inversion, formes de base
-  model/              état de la waveform (mode, courbe, points), sérialisation, presets
-  ui/                 zone de dessin et thème graphique
-Tests/                tests automatiques (+ outil de captures d'écran)
-packaging/            fichiers ajoutés à l'archive de distribution
+  PluginProcessor.*   plugin core: processBlock, parameters, state saving, undo
+  PluginEditor.*      main window (buttons, knobs, virtual keyboard)
+  Parameters.*        automatable parameters (IDs must never be renamed)
+  dsp/                audio engine (no allocation and no locks on the audio thread)
+    Wavetable.*         FFT band-limited tables, DC removal, normalisation, interpolation
+    Voice.*, Envelope.h one voice: oscillator + ADSR + velocity
+    SynthEngine.*       16 voices, MIDI, voice stealing, crossfade between waveforms
+    TablePublisher.h    hands tables to the audio thread via an atomic exchange, never frees memory there
+    WavetableBuilder.h  background thread that computes the tables
+    WaveformOps.*, WaveShapes.*  strokes, smoothing, inversion, basic shapes
+  model/              waveform state (mode, curve, points), serialisation, presets
+  ui/                 drawing area and visual theme
+Tests/                automated tests (+ screenshot tool)
+packaging/            files added to the distribution archive
 ```
 
-**Circulation d'une modification :** l'interface modifie la waveform → un thread d'arrière-plan calcule
-les tables (FFT) → elles sont publiées par un échange atomique → le thread audio les récupère au bloc
-suivant et fait un fondu de 20 ms depuis l'ancienne. Les anciennes tables sont rendues à l'interface,
-qui les libère : le thread audio ne libère jamais de mémoire.
+**How an edit travels:** the UI changes the waveform → a background thread computes the tables (FFT)
+→ they are published through an atomic exchange → the audio thread picks them up on the next block
+and crossfades from the old one over 20 ms. Old tables are handed back to the UI thread, which frees
+them: the audio thread never frees memory.
 
 ## Licence
 
-Aucune licence n'a encore été choisie pour ce projet : en l'absence de fichier de licence, le code est
-visible mais tous les droits restent réservés à son auteur.
+No licence has been chosen for this project yet: without a licence file, the code is visible
+but all rights remain reserved by its author.
 
-WaveSketch utilise **JUCE**, distribué sous double licence : **AGPLv3** ou **licence commerciale JUCE**
-(voir [juce.com/legal/juce-9-licence](https://juce.com/legal/juce-9-licence/) et le
-[LICENSE.md de JUCE](https://github.com/juce-framework/JUCE/blob/master/LICENSE.md)).
-Le choix de la licence de WaveSketch doit en tenir compte avant toute distribution.
+WaveSketch uses **JUCE**, which is dual-licensed: **AGPLv3** or the **commercial JUCE licence**
+(see [juce.com/legal/juce-9-licence](https://juce.com/legal/juce-9-licence/) and
+[JUCE's LICENSE.md](https://github.com/juce-framework/JUCE/blob/master/LICENSE.md)).
+The licence chosen for WaveSketch must take this into account before any distribution.
